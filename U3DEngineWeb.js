@@ -460,7 +460,7 @@ Vector4D.prototype =
 				this.Context.compileShader(shader);
 				if (!this.Context.getShaderParameter(shader, this.Context.COMPILE_STATUS)) 
 				{
-					alert(this.Context.getShaderInfoLog(shader));
+					Log(this.Context.getShaderInfoLog(shader));
 					return null;
 				}
 
@@ -474,7 +474,7 @@ Vector4D.prototype =
 				this.Context.compileShader(shader);
 				if (!this.Context.getShaderParameter(shader, this.Context.COMPILE_STATUS)) 
 				{
-					alert(this.Context.getShaderInfoLog(shader));
+					Log(this.Context.getShaderInfoLog(shader));
 					return null;
 				}
 				return shader;
@@ -489,7 +489,7 @@ Vector4D.prototype =
 
 				if (!this.Context.getProgramParameter(shaderProgram, this.Context.LINK_STATUS)) 
 				{
-				  alert("Could not initialise shaders");
+				  Log("Could not initialise shaders");
 				}
 				return shaderProgram;
 			},
@@ -554,11 +554,7 @@ Vector4D.prototype =
 				var canvas = document.createElement( 'canvas' );
 				canvas.width = _image.height;
 				canvas.height = _image.height;
-				//canvas.style.position = 'fixed';
-				//canvas.style.left = '0';
-				//canvas.style.top = '0';
 				var context = canvas.getContext( '2d' );
-				//document.body.appendChild(canvas);
 
 				context.fillStyle = 'rgb(255,255,255)';	
 				context.fillRect(0, 0, canvas.width, canvas.height);
@@ -651,7 +647,7 @@ Vector4D.prototype =
 					
 					this.Context.bindBuffer(this.Context.ELEMENT_ARRAY_BUFFER, _camera.SkyBox.IndexBuffer);
 
-					this.Context.uniformMatrix4fv(_camera.SkyBox.ShaderProgram.World, false, _camera.GetSkyBoxWorld());
+					this.Context.uniformMatrix4fv(_camera.SkyBox.ShaderProgram.World, false, _camera.GetWorldMatrix());
 					this.Context.uniformMatrix4fv(_camera.SkyBox.ShaderProgram.View, false, _camera.GetViewMatrix());
 					this.Context.uniformMatrix4fv(_camera.SkyBox.ShaderProgram.Projection, false, _camera.Projection);
 								
@@ -685,212 +681,275 @@ Vector4D.prototype =
 
 					for(var j = 0; j < _scene.Lights.length; j++)
 					{
-						if(!_scene.Lights[j].ShaderProgram)
+						//ShadowMap
 						{
-							var FS = this.CompileFragmentShaderCode(_scene.Lights[j].CodeFragmentShader);
-							var VS = this.CompileVertexShaderCode(_scene.Lights[j].CodeVertexShader);
-							_scene.Lights[j].ShaderProgram = this.CreateShaderProgram(FS,VS);
-																
-							_scene.Lights[j].ShaderProgram.Pos = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Pos");						
-							_scene.Lights[j].ShaderProgram.TexCoord = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "TexCoord");
-								        				
-			    			_scene.Lights[j].ShaderProgram.World = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "World");
-							_scene.Lights[j].ShaderProgram.Projection = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Projection");
-							_scene.Lights[j].ShaderProgram.View = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "View");
+							if(_scene.Objs[i].isCastShadow&&_scene.Lights[j].isShadows)
+							{
+								if(!_scene.Lights[j].ShadowMap.RT.Texture || _scene.Lights[j].ShadowMap.RT.width != _scene.Lights[j].ShadowMap.width || _scene.Lights[j].ShadowMap.RT.height != _scene.Lights[j].ShadowMap.height) 
+									{
+										this.CreateRenderTexture(_scene.Lights[j].ShadowMap.RT,_scene.Lights[j].ShadowMap.width,_scene.Lights[j].ShadowMap.height);
+										_scene.Lights[j].Dimensions = new Vector4D(_scene.Lights[j].ShadowMap.width,_scene.Lights[j].ShadowMap.height,1/_scene.Lights[j].ShadowMap.width,1/_scene.Lights[j].ShadowMap.height);
+									}
+								this.SetRenderTexture(_scene.Lights[j].ShadowMap.RT);							
+								if(i == 0) this.Clear(1.0,1.0,1.0,1.0,1.0);
 
-							_scene.Lights[j].ShaderProgram.Ambient = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Ambient");
-							_scene.Lights[j].ShaderProgram.Diffuse = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Diffuse");
-							_scene.Lights[j].ShaderProgram.DiffuseSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "DiffuseSampler");
-							_scene.Lights[j].ShaderProgram.isDiffuseTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isDiffuseTexture");
+								if(!_scene.Lights[j].ShadowMap.ShaderProgram)
+								{
+									var FS = this.CompileFragmentShaderCode(_scene.Lights[j].ShadowMap.CodeFragmentShader);
+									var VS = this.CompileVertexShaderCode(_scene.Lights[j].ShadowMap.CodeVertexShader);
+									_scene.Lights[j].ShadowMap.ShaderProgram = this.CreateShaderProgram(FS,VS);
+
+									_scene.Lights[j].ShadowMap.ShaderProgram.Pos = this.Context.getAttribLocation(_scene.Lights[j].ShadowMap.ShaderProgram, "Pos");						
+									        				
+				    				_scene.Lights[j].ShadowMap.ShaderProgram.World = this.Context.getUniformLocation(_scene.Lights[j].ShadowMap.ShaderProgram, "World");
+									_scene.Lights[j].ShadowMap.ShaderProgram.Projection = this.Context.getUniformLocation(_scene.Lights[j].ShadowMap.ShaderProgram, "Projection");
+									_scene.Lights[j].ShadowMap.ShaderProgram.View = this.Context.getUniformLocation(_scene.Lights[j].ShadowMap.ShaderProgram, "View");																
+								}
+
+								this.Context.useProgram(_scene.Lights[j].ShadowMap.ShaderProgram);
+								this.Context.enableVertexAttribArray(_scene.Lights[j].ShadowMap.ShaderProgram.Pos);
+
+								this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].VertexBuffer);
+			    				this.Context.vertexAttribPointer(_scene.Lights[j].ShadowMap.ShaderProgram.Pos, _scene.Objs[i].CountVertexItem, this.Context.FLOAT, false, 0, 0);
+			    				
+			    				this.Context.bindBuffer(this.Context.ELEMENT_ARRAY_BUFFER, _scene.Objs[i].IndexBuffer);
+
+			    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShadowMap.ShaderProgram.World, false, _scene.Objs[i].GetWorldMatrix());
+			    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShadowMap.ShaderProgram.View, false, _scene.Lights[j].GetViewMatrix());
+			    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShadowMap.ShaderProgram.Projection, false, _scene.Lights[j].Projection);	
+
+			    				this.Context.drawElements(this.Context.TRIANGLES, _scene.Objs[i].CountIndex, this.Context.UNSIGNED_SHORT, 0);		    																			
+								
+								this.SetRenderTexture(this.PostRT[0]);
+							}							
+						}
+
+						//Light
+						{
+							if(!_scene.Lights[j].ShaderProgram)
+							{
+								var FS = this.CompileFragmentShaderCode(_scene.Lights[j].CodeFragmentShader);
+								var VS = this.CompileVertexShaderCode(_scene.Lights[j].CodeVertexShader);
+								_scene.Lights[j].ShaderProgram = this.CreateShaderProgram(FS,VS);
+																	
+								_scene.Lights[j].ShaderProgram.Pos = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Pos");						
+								_scene.Lights[j].ShaderProgram.TexCoord = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "TexCoord");
+									        				
+				    			_scene.Lights[j].ShaderProgram.World = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "World");
+								_scene.Lights[j].ShaderProgram.Projection = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Projection");
+								_scene.Lights[j].ShaderProgram.View = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "View");
+
+				    			_scene.Lights[j].ShaderProgram.LWorld = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "LWorld");
+								_scene.Lights[j].ShaderProgram.LProjection = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "LProjection");
+								_scene.Lights[j].ShaderProgram.LView = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "LView");
+
+								_scene.Lights[j].ShaderProgram.Ambient = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Ambient");
+								_scene.Lights[j].ShaderProgram.Diffuse = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Diffuse");
+								_scene.Lights[j].ShaderProgram.DiffuseSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "DiffuseSampler");
+								_scene.Lights[j].ShaderProgram.isDiffuseTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isDiffuseTexture");
+
+								if(_scene.Lights[j].TypeLight != 'AmbientLight')
+								{
+									_scene.Lights[j].ShaderProgram.Specular = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Specular");
+									_scene.Lights[j].ShaderProgram.Shininess = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Shininess");
+
+									_scene.Lights[j].ShaderProgram.Normal = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Normal");
+									_scene.Lights[j].ShaderProgram.Tangent = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Tangent");
+									_scene.Lights[j].ShaderProgram.Binormal = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Binormal");
+
+									_scene.Lights[j].ShaderProgram.BumpSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "BumpSampler");
+									_scene.Lights[j].ShaderProgram.SpecularSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "SpecularSampler");	
+									_scene.Lights[j].ShaderProgram.ShadowMapSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "ShadowMapSampler");
+									_scene.Lights[j].ShaderProgram.isBumpTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isBumpTexture");	
+									_scene.Lights[j].ShaderProgram.isShadows = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isShadows");
+									_scene.Lights[j].ShaderProgram.isSpecularTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isSpecularTexture");
+
+						    		_scene.Lights[j].ShaderProgram.NormalWorld = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "NormalWorld");
+									_scene.Lights[j].ShaderProgram.Camera = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Camera");
+									_scene.Lights[j].ShaderProgram.Dimensions = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Dimensions");
+									_scene.Lights[j].ShaderProgram.isSpecular = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isSpecular");
+									_scene.Lights[j].ShaderProgram.isLight = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isLight");
+								}
+
+								switch(_scene.Lights[j].TypeLight)
+								{
+									case 'AmbientLight': 
+									{
+										_scene.Lights[j].ShaderProgram.EmissiveSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "EmissiveSampler");
+										_scene.Lights[j].ShaderProgram.isEmissiveTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isEmissiveTexture");
+
+										_scene.Lights[j].ShaderProgram.AmbientColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "AmbientColor");
+									}
+									break;
+
+									case 'DirectionalLight' :
+									{
+										_scene.Lights[j].ShaderProgram.Direction = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Direction");
+										_scene.Lights[j].ShaderProgram.DirectionColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "DirectionColor");
+									}
+									break;
+
+									case 'PointLight' :
+									{
+										_scene.Lights[j].ShaderProgram.Point = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Point");
+										_scene.Lights[j].ShaderProgram.PointColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "PointColor");
+										_scene.Lights[j].ShaderProgram.Range = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Range");
+									}
+									break;
+
+									case 'SpotLight' :
+									{
+										_scene.Lights[j].ShaderProgram.Spot = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Spot");
+										_scene.Lights[j].ShaderProgram.SpotColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "SpotColor");
+										_scene.Lights[j].ShaderProgram.Direction = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Direction");
+										_scene.Lights[j].ShaderProgram.Exp = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Exp");
+										_scene.Lights[j].ShaderProgram.Range = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Range");
+										_scene.Lights[j].ShaderProgram.Distance = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Distance");
+									}
+									break;
+								}
+							}
+
+							this.Context.useProgram(_scene.Lights[j].ShaderProgram);
+							this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Pos);
+							this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.TexCoord);
+
+							switch(_scene.Lights[j].TypeLight)
+							{
+								case 'AmbientLight': 
+								{
+									this.DisableBlend();
+								}
+								break;
+
+								default :
+								{
+									this.EnableBlend();
+									this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Normal);
+									this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Tangent);
+									this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Binormal);
+								}
+								break;						
+							}
+
+
+							this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].VertexBuffer);
+		    				this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Pos, _scene.Objs[i].CountVertexItem, this.Context.FLOAT, false, 0, 0);
+		    				
+		    				this.Context.bindBuffer(this.Context.ELEMENT_ARRAY_BUFFER, _scene.Objs[i].IndexBuffer);
+
+							this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].TexCoordBuffer);
+							this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.TexCoord, _scene.Objs[i].CountTexCoordItem, this.Context.FLOAT, false, 0, 0);
+
+		    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.World, false, _scene.Objs[i].GetWorldMatrix());
+		    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.View, false, _camera.GetViewMatrix());
+		    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.Projection, false, _camera.Projection);
+
+		    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.LWorld, false, _scene.Objs[i].GetWorldMatrix());
+		    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.LView, false, _scene.Lights[j].GetViewMatrix());
+		    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.LProjection, false, _scene.Lights[j].Projection);
+
+							this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Ambient, _scene.Objs[i].Material.Ambient.GetVector4DA());
+							this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Diffuse, _scene.Objs[i].Material.Diffuse.GetVector4DA());
+		    				this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isDiffuseTexture, _scene.Objs[i].Material.TextureDiffuse.isTexture);
+										
+							this.Context.activeTexture(this.Context.TEXTURE0);
+							this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureDiffuse.Texture);
+							this.Context.uniform1i(_scene.Lights[j].ShaderProgram.DiffuseSampler, 0);
+					
 
 							if(_scene.Lights[j].TypeLight != 'AmbientLight')
 							{
-								_scene.Lights[j].ShaderProgram.Specular = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Specular");
-								_scene.Lights[j].ShaderProgram.Shininess = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Shininess");
+								this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Specular, _scene.Objs[i].Material.Specular.GetVector4DA());
+								this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Shininess, _scene.Objs[i].Material.Shininess);
+								
+								this.Context.activeTexture(this.Context.TEXTURE2);
+								this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureBump.Texture);
+								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.BumpSampler, 2);
+									
+								this.Context.activeTexture(this.Context.TEXTURE3);
+								this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureSpecular.Texture);
+								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.SpecularSampler, 3);
 
-								_scene.Lights[j].ShaderProgram.Normal = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Normal");
-								_scene.Lights[j].ShaderProgram.Tangent = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Tangent");
-								_scene.Lights[j].ShaderProgram.Binormal = this.Context.getAttribLocation(_scene.Lights[j].ShaderProgram, "Binormal");
+								this.Context.activeTexture(this.Context.TEXTURE4);
+								this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Lights[j].ShadowMap.RT.Texture);
+								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.ShadowMapSampler, 4);
 
-								_scene.Lights[j].ShaderProgram.BumpSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "BumpSampler");
-								_scene.Lights[j].ShaderProgram.SpecularSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "SpecularSampler");	
-								_scene.Lights[j].ShaderProgram.isBumpTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isBumpTexture");
-								_scene.Lights[j].ShaderProgram.isSpecularTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isSpecularTexture");
+								this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].NormalBuffer);					
+								this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Normal, _scene.Objs[i].CountNormalItem, this.Context.FLOAT, false, 0, 0);
 
-					    		_scene.Lights[j].ShaderProgram.NormalWorld = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "NormalWorld");
-								_scene.Lights[j].ShaderProgram.Camera = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Camera");
-								_scene.Lights[j].ShaderProgram.isSpecular = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isSpecular");
-								_scene.Lights[j].ShaderProgram.isLight = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isLight");
+								this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].TangentBuffer);					
+								this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Tangent, _scene.Objs[i].CountTangentItem, this.Context.FLOAT, false, 0, 0);
+
+								this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].BinormalBuffer);					
+								this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Binormal, _scene.Objs[i].CountBinormalItem, this.Context.FLOAT, false, 0, 0);
+
+		    					this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isBumpTexture, _scene.Objs[i].Material.TextureBump.isTexture);
+		    					this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isSpecularTexture, _scene.Objs[i].Material.TextureSpecular.isTexture);
+		    					this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isShadows, _scene.Lights[j].isShadows);
+
+								this.Context.uniformMatrix3fv(_scene.Lights[j].ShaderProgram.NormalWorld, false, _scene.Objs[i].NormalWorld);
+								this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Camera, _camera.Position.GetVector3DA());
+								this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Dimensions, _scene.Lights[j].Dimensions.GetVector4DA());
+
+								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isSpecular, _scene.Lights[j].isSpecular);
+								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isLight, _scene.Lights[j].isLight);
 							}
 
 							switch(_scene.Lights[j].TypeLight)
 							{
 								case 'AmbientLight': 
 								{
-									_scene.Lights[j].ShaderProgram.EmissiveSampler = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "EmissiveSampler");
-									_scene.Lights[j].ShaderProgram.isEmissiveTexture = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "isEmissiveTexture");
+									this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isEmissiveTexture, _scene.Objs[i].Material.TextureEmissive.isTexture);
 
-									_scene.Lights[j].ShaderProgram.AmbientColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "AmbientColor");
+									this.Context.activeTexture(this.Context.TEXTURE1);
+									this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureEmissive.Texture);
+									this.Context.uniform1i(_scene.Lights[j].ShaderProgram.EmissiveSampler, 1);	
+
+									this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.AmbientColor, _scene.Lights[j].Color.GetVector4DA());
 								}
 								break;
 
-								case 'DirectionalLight' :
+								case 'DirectionalLight':
 								{
-									_scene.Lights[j].ShaderProgram.Direction = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Direction");
-									_scene.Lights[j].ShaderProgram.DirectionColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "DirectionColor");
+									var Direction = vec3.create();
+									Direction = _scene.Lights[j].Direction.GetVector3DA();
+									vec3.normalize(Direction, Direction);
+									vec3.scale(Direction, -1);
+
+									this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Direction, Direction);
+									this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.DirectionColor, _scene.Lights[j].Color.GetVector4DA());														
 								}
 								break;
 
-								case 'PointLight' :
+								case 'PointLight':
 								{
-									_scene.Lights[j].ShaderProgram.Point = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Point");
-									_scene.Lights[j].ShaderProgram.PointColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "PointColor");
-									_scene.Lights[j].ShaderProgram.Range = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Range");
+									this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Point, _scene.Lights[j].Position.GetVector3DA());
+									this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.PointColor, _scene.Lights[j].Color.GetVector4DA());
+									this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Range, _scene.Lights[j].Range);								
 								}
-								break;
+								break;	
 
-								case 'SpotLight' :
+								case 'SpotLight':
 								{
-									_scene.Lights[j].ShaderProgram.Spot = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Spot");
-									_scene.Lights[j].ShaderProgram.SpotColor = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "SpotColor");
-									_scene.Lights[j].ShaderProgram.Direction = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Direction");
-									_scene.Lights[j].ShaderProgram.Exp = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Exp");
-									_scene.Lights[j].ShaderProgram.Range = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Range");
-									_scene.Lights[j].ShaderProgram.Distance = this.Context.getUniformLocation(_scene.Lights[j].ShaderProgram, "Distance");
+									var Direction = vec3.create();
+									Direction = _scene.Lights[j].Direction.GetVector3DA();
+									vec3.normalize(Direction, Direction);
+									vec3.scale(Direction, -1);
+
+									this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Spot, _scene.Lights[j].Position.GetVector3DA());
+									this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.SpotColor, _scene.Lights[j].Color.GetVector4DA());
+									this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Direction, Direction);
+									this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Exp, _scene.Lights[j].Exp);
+									this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Range, Math.cos(degToRad(_scene.Lights[j].Range)));
+									this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Distance, _scene.Lights[j].Distance);								
 								}
-								break;
+								break;												
 							}
-						}
 
-						this.Context.useProgram(_scene.Lights[j].ShaderProgram);
-						this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Pos);
-						this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.TexCoord);
-
-						switch(_scene.Lights[j].TypeLight)
-						{
-							case 'AmbientLight': 
-							{
-								this.DisableBlend();
-							}
-							break;
-
-							default :
-							{
-								this.EnableBlend();
-								this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Normal);
-								this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Tangent);
-								this.Context.enableVertexAttribArray(_scene.Lights[j].ShaderProgram.Binormal);
-							}
-							break;						
-						}
-
-
-						this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].VertexBuffer);
-	    				this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Pos, _scene.Objs[i].CountVertexItem, this.Context.FLOAT, false, 0, 0);
-	    				
-	    				this.Context.bindBuffer(this.Context.ELEMENT_ARRAY_BUFFER, _scene.Objs[i].IndexBuffer);
-
-						this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].TexCoordBuffer);
-						this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.TexCoord, _scene.Objs[i].CountTexCoordItem, this.Context.FLOAT, false, 0, 0);
-
-	    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.World, false, _scene.Objs[i].GetWorldMatrix());
-	    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.View, false, _camera.GetViewMatrix());
-	    				this.Context.uniformMatrix4fv(_scene.Lights[j].ShaderProgram.Projection, false, _camera.Projection);
-
-						this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Ambient, _scene.Objs[i].Material.Ambient.GetVector4DA());
-						this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Diffuse, _scene.Objs[i].Material.Diffuse.GetVector4DA());
-	    				this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isDiffuseTexture, _scene.Objs[i].Material.TextureDiffuse.isTexture);
-									
-						this.Context.activeTexture(this.Context.TEXTURE0);
-						this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureDiffuse.Texture);
-						this.Context.uniform1i(_scene.Lights[j].ShaderProgram.DiffuseSampler, 0);
-				
-
-						if(_scene.Lights[j].TypeLight != 'AmbientLight')
-						{
-							this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.Specular, _scene.Objs[i].Material.Specular.GetVector4DA());
-							this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Shininess, _scene.Objs[i].Material.Shininess);
-							
-							this.Context.activeTexture(this.Context.TEXTURE2);
-							this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureBump.Texture);
-							this.Context.uniform1i(_scene.Lights[j].ShaderProgram.BumpSampler, 2);
-								
-							this.Context.activeTexture(this.Context.TEXTURE3);
-							this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureSpecular.Texture);
-							this.Context.uniform1i(_scene.Lights[j].ShaderProgram.SpecularSampler, 3);
-
-							this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].NormalBuffer);					
-							this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Normal, _scene.Objs[i].CountNormalItem, this.Context.FLOAT, false, 0, 0);
-
-							this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].TangentBuffer);					
-							this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Tangent, _scene.Objs[i].CountTangentItem, this.Context.FLOAT, false, 0, 0);
-
-							this.Context.bindBuffer(this.Context.ARRAY_BUFFER, _scene.Objs[i].BinormalBuffer);					
-							this.Context.vertexAttribPointer(_scene.Lights[j].ShaderProgram.Binormal, _scene.Objs[i].CountBinormalItem, this.Context.FLOAT, false, 0, 0);
-
-	    					this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isBumpTexture, _scene.Objs[i].Material.TextureBump.isTexture);
-	    					this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isSpecularTexture, _scene.Objs[i].Material.TextureSpecular.isTexture);
-
-							this.Context.uniformMatrix3fv(_scene.Lights[j].ShaderProgram.NormalWorld, false, _scene.Objs[i].NormalWorld);
-							this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Camera, _camera.Position.GetVector3DA());
-
-							this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isSpecular, _scene.Lights[j].isSpecular);
-							this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isLight, _scene.Lights[j].isLight);
-						}
-
-						switch(_scene.Lights[j].TypeLight)
-						{
-							case 'AmbientLight': 
-							{
-								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.isEmissiveTexture, _scene.Objs[i].Material.TextureEmissive.isTexture);
-
-								this.Context.activeTexture(this.Context.TEXTURE1);
-								this.Context.bindTexture(this.Context.TEXTURE_2D, _scene.Objs[i].Material.TextureEmissive.Texture);
-								this.Context.uniform1i(_scene.Lights[j].ShaderProgram.EmissiveSampler, 1);	
-
-								this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.AmbientColor, _scene.Lights[j].Color.GetVector4DA());
-							}
-							break;
-
-							case 'DirectionalLight':
-							{
-								var Direction = vec3.create();
-								Direction = _scene.Lights[j].Direction.GetVector3DA();
-								vec3.normalize(Direction, Direction);
-								vec3.scale(Direction, -1);
-
-								this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Direction, Direction);
-								this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.DirectionColor, _scene.Lights[j].Color.GetVector4DA());														
-							}
-							break;
-
-							case 'PointLight':
-							{
-								this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Point, _scene.Lights[j].Position.GetVector3DA());
-								this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.PointColor, _scene.Lights[j].Color.GetVector4DA());
-								this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Range, _scene.Lights[j].Range);								
-							}
-							break;	
-
-							case 'SpotLight':
-							{
-								var Direction = vec3.create();
-								Direction = _scene.Lights[j].Direction.GetVector3DA();
-								vec3.normalize(Direction, Direction);
-								vec3.scale(Direction, -1);
-
-								this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Spot, _scene.Lights[j].Position.GetVector3DA());
-								this.Context.uniform4fv(_scene.Lights[j].ShaderProgram.SpotColor, _scene.Lights[j].Color.GetVector4DA());
-								this.Context.uniform3fv(_scene.Lights[j].ShaderProgram.Direction, Direction);
-								this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Exp, _scene.Lights[j].Exp);
-								this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Range, Math.cos(degToRad(_scene.Lights[j].Range)));
-								this.Context.uniform1f(_scene.Lights[j].ShaderProgram.Distance, _scene.Lights[j].Distance);								
-							}
-							break;												
-						}
-
-	     				//this.Context.drawArrays(this.Context.TRIANGLE_STRIP, 0, _scene.Objs[j].CountIndex);
-	     				this.Context.drawElements(this.Context.TRIANGLES, _scene.Objs[i].CountIndex, this.Context.UNSIGNED_SHORT, 0);
+		     				//this.Context.drawArrays(this.Context.TRIANGLE_STRIP, 0, _scene.Objs[j].CountIndex);
+		     				this.Context.drawElements(this.Context.TRIANGLES, _scene.Objs[i].CountIndex, this.Context.UNSIGNED_SHORT, 0);
+	     				}
 					}
 				}
 
@@ -1128,6 +1187,47 @@ Vector4D.prototype =
 	}
 	/*---------------End Texture---------------*/
 
+	/*---------------Begin ShadowMap---------------*/
+	{
+		U3DEW.ShadowMap = function()
+		{
+			this.RT = new U3DEW.RenderTexture();
+			this.width = 512;
+			this.height = 512;
+			this.ShaderProgram = null;
+			this.CodeVertexShader = [
+				"attribute vec3 Pos;",
+
+				'uniform mat4 Projection;',
+				'uniform mat4 World;',
+				'uniform mat4 View;',
+
+				'varying vec3 fColor;',
+				"void main() {",
+					'gl_Position = Projection * View * World * vec4(Pos, 1.0);',
+					'fColor = vec3(0.0,0.0,0.0);',
+				"}"
+
+			].join("\n");
+
+			this.CodeFragmentShader = [
+				"precision mediump float;",
+				'varying vec3 fColor;',
+				"uniform samplerCube Sampler;",
+
+				"void main() {",				
+					'gl_FragColor = vec4(fColor,1.0);',
+				"}"
+
+			].join("\n");		
+		}
+		U3DEW.ShadowMap.prototype =
+		{
+			constructor: U3DEW.ShadowMap
+		}
+	}
+	/*---------------End ShadowMap---------------*/
+
 	/*---------------Begin SkyBox---------------*/
 	{
 		U3DEW.SkyBox = function()
@@ -1231,6 +1331,34 @@ Vector4D.prototype =
 				mat3.transpose(this.NormalWorld);
 
 				return this.World ;
+			}
+		}
+	}
+	/*---------------End Transform---------------*/
+
+	/*---------------Begin PerspectiveCamera---------------*/
+	{
+		U3DEW.PerspectiveCamera = function(_fovy, _aspect, _znear, _zfar)
+		{
+			U3DEW.Transform.call( this );
+			this.Type = 'PerspectiveCamera';
+			this.Fovy = _fovy;
+			this.Aspect = _aspect;
+			this.Znear = _znear;
+			this.Zfar = _zfar;
+			this.SkyBox = new U3DEW.SkyBox();
+
+			mat4.identity(this.Projection);
+			mat4.perspective(_fovy, _aspect, _znear, _zfar, this.Projection);
+		}
+		U3DEW.PerspectiveCamera.prototype = 
+		{
+			constructor: U3DEW.PerspectiveCamera,
+
+			Update: function()
+			{
+				mat4.identity(this.Projection);
+				mat4.perspective(this.Fovy, this.Aspect, this.Znear, this.Zfar, this.Projection);
 			},
 
 			GetViewMatrix: function()
@@ -1276,36 +1404,12 @@ Vector4D.prototype =
 				this.Position.z += Direction[2];
 			},
 
-			GetSkyBoxWorld: function()
+			GetWorldMatrix: function()
 			{
 				var MP = mat4.create(); mat4.identity(MP);
 				mat4.translate(MP, [this.Position.x, this.Position.y, this.Position.z]);
 				return MP;
 			}
-		}
-	}
-	/*---------------End Transform---------------*/
-
-	/*---------------Begin PerspectiveCamera---------------*/
-	{
-		U3DEW.PerspectiveCamera = function(_fovy, _aspect, _znear, _zfar)
-		{
-			U3DEW.Transform.call( this );
-			this.Type = 'PerspectiveCamera';
-			this.Fovy = _fovy;
-			this.Aspect = _aspect;
-			this.Znear = _znear;
-			this.Zfar = _zfar;
-			this.SkyBox = new U3DEW.SkyBox();
-
-			mat4.identity(this.Projection);
-			mat4.perspective(_fovy, _aspect, _znear, _zfar, this.Projection);
-		}
-		U3DEW.PerspectiveCamera.prototype = Object.create( U3DEW.Transform.prototype );
-		U3DEW.PerspectiveCamera.prototype.Update = function()
-		{
-			mat4.identity(this.Projection);
-			mat4.perspective(this.Fovy, this.Aspect, this.Znear, this.Zfar, this.Projection);
 		}
 	}
 	/*---------------End PerspectiveCamera---------------*/
@@ -1349,7 +1453,9 @@ Vector4D.prototype =
 
 				this.TexCoords = [];
 				this.CountTexCoord = 0;
-				this.CountTexCoordItem = 0;					
+				this.CountTexCoordItem = 0;	
+
+				this.isCastShadow	= false;			
 			}
 			U3DEW.Object3D.prototype = Object.create( U3DEW.Transform.prototype );
 			U3DEW.Object3D.prototype.CalcNormal = function()
@@ -1669,16 +1775,286 @@ Vector4D.prototype =
 				this.Type = 'Light';
 				this.Color = new Vector4D(1.0,1.0,1.0,1.0);
 				this.ShaderProgram = null;
-
+				this.ShadowMap = new U3DEW.ShadowMap();
+				this.isShadows = false;
+				mat4.identity(this.Projection);
+				mat4.perspective(45, this.ShadowMap.width/this.ShadowMap.height, 0.1, 1000, this.Projection);
+				this.Dimensions = new Vector4D(this.ShadowMap.width,this.ShadowMap.height,1/this.ShadowMap.width,1/this.ShadowMap.height);
+				this.Direction = new Vector3D(0.0,0.0,-1.0);
 				this.isSpecular = false;
 				this.isLight = true;
 			}
 			U3DEW.Light.prototype = 
 			{
-				constructor: U3DEW.Light
+				constructor: U3DEW.Light,
+				GetWorldMatrix: function()
+				{
+					var MP = mat4.create(); mat4.identity(MP);
+					mat4.translate(MP, [this.Position.x, this.Position.y, this.Position.z]);
+					return MP;
+				},
+				GetViewMatrix: function()
+				{
+					var MRx = mat4.create(); mat4.identity(MRx);
+					var MRy = mat4.create(); mat4.identity(MRy);
+					var MRz = mat4.create(); mat4.identity(MRz);
+					var MR = mat4.create(); mat4.identity(MR);
+
+					mat4.rotate(MRx, degToRad(this.Rotate.x), [1, 0, 0]);
+					mat4.rotate(MRy, degToRad(this.Rotate.y), [0, 1, 0]);
+					mat4.rotate(MRz, degToRad(this.Rotate.z), [0, 0, 1]);
+
+					mat4.multiply(MRy, MRx, MR);
+					mat4.multiply(MR, MRz, MR);
+
+					var Direction = mat4.multiplyVec3(MR, this.Direction.GetVector3DA());
+				   	var Up = mat4.multiplyVec3(MR, [0,1,0]);
+					Direction = vec3.add(Direction, this.Position.GetVector3DA());
+
+					mat4.lookAt(this.Position.GetVector3DA(), Direction, Up, this.View);
+					return this.View;					
+				}				
 			}
 		}
 		/*---------------End Light---------------*/
+
+		/*---------------Begin ShadowFragment---------------*/
+		{
+			ShadowFragment = 
+			[
+				'#define FILTER_SIZE    11',
+				'#define FS  FILTER_SIZE',
+				'#define FS2 ( FILTER_SIZE / 2 )',
+
+				// 4 control matrices for a dynamic cubic bezier filter weights matrix
+				
+				'float C3[121];',
+				'float C2[121];',
+				'float C1[121];',
+				'float C0[121];',
+
+				'void initWeights() {',
+
+					'if(C3[0] == 1.0) return;',
+
+					'for(int i = 0; i < 121; i++) {',
+						'C3[i] = 1.0;',
+
+						'if(i>12 && i<22)',
+							'C2[i] = 0.2;',
+						'if(i==24 || i==35 || i==46 || i==57 || i==68 || i==79 || i==90)',
+							'C2[i] = 0.2;',
+						'if(i>100 && i<110)',
+							'C2[i] = 0.2;',
+						'if(i==32 || i==43 || i==54 || i==65 || i==76 || i==87 || i==98)',
+							'C2[i] = 0.2;',	
+
+						'if(i>24 && i<32)',
+							'C2[i] = 1.0;',
+						'if(i>35 && i<43)',
+							'C2[i] = 1.0;',	
+						'if(i>46 && i<54)',
+							'C2[i] = 1.0;',		
+						'if(i>57 && i<65)',
+							'C2[i] = 1.0;',
+						'if(i>68 && i<76)',
+							'C2[i] = 1.0;',
+						'if(i>79 && i<87)',
+							'C2[i] = 1.0;',
+						'if(i>90 && i<98)',
+							'C2[i] = 1.0;',
+
+						'if(i>23 && i<32)',
+							'C1[i] = 0.2;',
+						'if(i==35 || i==46 || i==57 || i==68 || i==79 )',
+							'C1[i] = 0.2;',
+						'if(i>90 && i<101)',
+							'C1[i] = 0.2;',
+						'if(i==42 || i==53 || i==64 || i==75 || i==86 )',
+							'C1[i] = 0.2;',
+
+						'if(i>35 && i<42)',
+							'C1[i] = 1.0;',
+						'if(i>46 && i<53)',
+							'C1[i] = 1.0;',	
+						'if(i>57 && i<64)',
+							'C1[i] = 1.0;',		
+						'if(i>68 && i<75)',
+							'C1[i] = 1.0;',
+						'if(i>79 && i<86)',
+							'C1[i] = 1.0;',	
+
+						'if(i>59 && i<64)',
+							'C0[i] = 0.8;',
+						'if(i==72 || i==83)',
+							'C0[i] = 0.8;',
+						'if(i>94 && i<96)',
+							'C0[i] = 0.8;',
+						'if(i==74 || i==85)',
+							'C0[i] = 0.8;',
+
+						'if(i==84)',
+							'C0[i] = 1.0;',																											
+					'}',
+				'}',
+				
+				// compute dynamic weight at a certain row, column of the matrix
+				'float Fw( const int r, float fL )',
+				'{',
+				    'return (1.0-fL)*(1.0-fL)*(1.0-fL) * C0[r] +',
+				           'fL*fL*fL * C3[r] +',
+				           '3.0 * (1.0-fL)*(1.0-fL)*fL * C1[r]+',
+				           '3.0 * fL*fL*(1.0-fL) * C2[r];',
+				'}', 
+
+				'#define BLOCKER_FILTER_SIZE    11',
+				'#define BFS  BLOCKER_FILTER_SIZE',
+				'#define BFS2 ( BLOCKER_FILTER_SIZE / 2 )',
+
+				   
+				//======================================================================================
+				// This shader computes the contact hardening shadow filter
+				//======================================================================================
+				'float shadow( vec3 tc, vec4 vShadowMapDimensions, sampler2D  txShadowMap, float fSunWidth) {',
+				    'float  s   = 0.0;',
+				   	'vec2 stc = ( vShadowMapDimensions.xy * tc.xy ) + vec2( 0.5, 0.5 );',
+				    'vec2 tcs = floor( stc );',
+				   	'vec2 fc;',
+				    'int    row;',
+				    'int    col;',
+				    'float  w = 0.0;',
+				    'float  avgBlockerDepth = 0.0;',
+				    'float  blockerCount = 0.0;',
+				    'float  fRatio;',
+				    'vec4 v1[ FS2 + 1 ];',
+				    'vec2 v0[ FS2 + 1 ];',
+				    'vec2 off;',
+
+				    'fc     = stc - tcs;',
+				    'tc.xy  = tc.xy - ( fc * vShadowMapDimensions.zw );',
+
+				    // find number of blockers and sum up blocker depth
+				    'for( row = -BFS2; row <= BFS2; row += 2 )',
+				        'for( col = -BFS2; col <= BFS2; col += 2 ) {',
+				            'vec4 d4 = texture2D( txShadowMap, tc.xy + vec2( col, row )).xxxx;',
+				            'vec4 b4  = ( tc.z <= d4.x && tc.z <= d4.y && tc.z <= d4.z && tc.z <= d4.w) ? vec4(0.0).xxxx : vec4(1.0).xxxx;',  
+
+				            'blockerCount += dot( b4, vec4(1.0).xxxx );',
+				            'avgBlockerDepth += dot( d4, b4 );',
+				       '}',
+
+				    // compute ratio using formulas from PCSS
+				    'if( blockerCount > 0.0 ) {',
+				        'avgBlockerDepth /= blockerCount;',
+				        'fRatio = max(( ( ( tc.z - avgBlockerDepth ) * fSunWidth ) / avgBlockerDepth), 0.0);',
+				        'fRatio *= fRatio;',
+				    '}',
+				    'else',
+				        'fRatio = 0.0;', 
+
+				    // sum up weights of dynamic filter matrix
+				    'for( row = 0; row < FS; ++row )',
+				       'for( col = 0; col < FS; ++col )',
+				          'w += Fw(row*11+col,fRatio);',
+
+				    // filter shadow map samples using the dynamic weights
+				    'for( row = -FS2; row <= FS2; row += 2 ) {',
+				        'for( col = -FS2; col <= FS2; col += 2 ) {',
+				            'v1[(col+FS2)/2] = texture2D( txShadowMap, tc.xy + vec2( col, row )).xxxx;',
+				          
+				            'if( col == -FS2 ) {',
+				                's += ( 1.0 - fc.y ) * ( v1[0].w * ( Fw((row+FS2)*11,fRatio) -', 
+				                                      'Fw((row+FS2)*11,fRatio) * fc.x ) + v1[0].z * ',
+				                                    '( fc.x * ( Fw((row+FS2)*11,fRatio) -', 
+				                                      'Fw((row+FS2)*11+1,fRatio) ) +  ',
+				                                      'Fw((row+FS2)*11+1,fRatio) ) );',
+				                's += (     fc.y ) * ( v1[0].x * ( Fw((row+FS2)*11,fRatio) -', 
+				                                      'Fw((row+FS2)*11,fRatio) * fc.x ) +', 
+				                                      'v1[0].y * ( fc.x * ( Fw((row+FS2)*11,fRatio) - ',
+				                                      'Fw((row+FS2)*11+1,fRatio) ) + ', 
+				                                      'Fw((row+FS2)*11+1,fRatio) ) );',
+				               ' if( row > -FS2 ) {',
+				                    's += ( 1.0 - fc.y ) * ( v0[0].x * ( Fw((row+FS2-1)*11,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11,fRatio) * fc.x ) + v0[0].y * ',
+				                                        '( fc.x * ( Fw((row+FS2-1)*11,fRatio) -',
+				                                          'Fw((row+FS2-1)*11+1,fRatio) ) + ', 
+				                                          'Fw((row+FS2-1)*11+1,fRatio) ) );',
+				                    's += (     fc.y ) * ( v1[0].w * ( Fw((row+FS2-1)*11,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11,fRatio) * fc.x ) + v1[0].z *', 
+				                                        '( fc.x * ( Fw((row+FS2-1)*11,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11+1,fRatio) ) + ', 
+				                                          'Fw((row+FS2-1)*11+1,fRatio) ) );',
+				                '}',
+				            '}',
+				            'else if( col == FS2 ) {',
+				                's += ( 1.0 - fc.y ) * ( v1[FS2].w * ( fc.x * ( Fw((row+FS2)*11+FS-2,fRatio) -', 
+				                                      'Fw((row+FS2)*11+FS-1,fRatio) ) + ',
+				                                      'Fw((row+FS2)*11+FS-1,fRatio) ) + v1[FS2].z * fc.x *', 
+				                                      'Fw((row+FS2)*11+FS-1,fRatio) );',
+				                's += (     fc.y ) * ( v1[FS2].x * ( fc.x * ( Fw((row+FS2)*11+FS-2,fRatio) -', 
+				                                      'Fw((row+FS2)*11+FS-1,fRatio) ) + ',
+				                                      'Fw((row+FS2)*11+FS-1,fRatio) ) + v1[FS2].y * fc.x *', 
+				                                      'Fw((row+FS2)*11+FS-1,fRatio) );',
+				                'if( row > -FS2 ) {',
+				                    's += ( 1.0 - fc.y ) * ( v0[FS2].x * ( fc.x *', 
+				                                        '( Fw((row+FS2-1)*11+FS-2,fRatio) - ',
+				                                          'Fw((row+FS2-1)*11+FS-1,fRatio) ) + ',
+				                                          'Fw((row+FS2-1)*11+FS-1,fRatio) ) + ',
+				                                          'v0[FS2].y * fc.x * Fw((row+FS2-1)*11+FS-1,fRatio) );',
+				                    's += (     fc.y ) * ( v1[FS2].w * ( fc.x * ',
+				                                        '( Fw((row+FS2-1)*11+FS-2,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11+FS-1,fRatio) ) +', 
+				                                          'Fw((row+FS2-1)*11+FS-1,fRatio) ) + ',
+				                                          'v1[FS2].z * fc.x * Fw((row+FS2-1)*11+FS-1,fRatio) );',
+				                '}',
+				            '}',
+				            'else {',
+				                's += ( 1.0 - fc.y ) * ( v1[(col+FS2)/2].w * ( fc.x *', 
+				                                    '( Fw((row+FS2)*11+col+FS2-1,fRatio) -', 
+				                                      'Fw((row+FS2)*11+col+FS2+0,fRatio) ) + ',
+				                                      'Fw((row+FS2)*11+col+FS2+0,fRatio) ) +',
+				                                      'v1[(col+FS2)/2].z * ( fc.x * ',
+				                                    '( Fw((row+FS2)*11+col+FS2-0,fRatio) -', 
+				                                      'Fw((row+FS2)*11+col+FS2+1,fRatio) ) +', 
+				                                      'Fw((row+FS2)*11+col+FS2+1,fRatio) ) );',
+				                's += (     fc.y ) * ( v1[(col+FS2)/2].x * ( fc.x *', 
+				                                    '( Fw((row+FS2)*11+col+FS2-1,fRatio) -', 
+				                                      'Fw((row+FS2)*11+col+FS2+0,fRatio) ) +', 
+				                                      'Fw((row+FS2)*11+col+FS2+0,fRatio) ) +',
+				                                      'v1[(col+FS2)/2].y * ( fc.x * ',
+				                                    '( Fw((row+FS2)*11+col+FS2-0,fRatio) -', 
+				                                      'Fw((row+FS2)*11+col+FS2+1,fRatio) ) + ',
+				                                      'Fw((row+FS2)*11+col+FS2+1,fRatio) ) );',
+				                'if( row > -FS2 ) {',
+				                    's += ( 1.0 - fc.y ) * ( v0[(col+FS2)/2].x * ( fc.x *', 
+				                                        '( Fw((row+FS2-1)*11+col+FS2-1,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+0,fRatio) ) +', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+0,fRatio) ) +',
+				                                          'v0[(col+FS2)/2].y * ( fc.x * ',
+				                                        '( Fw((row+FS2-1)*11+col+FS2-0,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+1,fRatio) ) +', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+1,fRatio) ) );',
+				                    's += (     fc.y ) * ( v1[(col+FS2)/2].w * ( fc.x * ',
+				                                        '( Fw((row+FS2-1)*11+col+FS2-1,fRatio) - ',
+				                                          'Fw((row+FS2-1)*11+col+FS2+0,fRatio) ) +', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+0,fRatio) ) +',
+				                                          'v1[(col+FS2)/2].z * ( fc.x *', 
+				                                        '( Fw((row+FS2-1)*11+col+FS2-0,fRatio) -', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+1,fRatio) ) +', 
+				                                          'Fw((row+FS2-1)*11+col+FS2+1,fRatio) ) );',
+				                '}',
+				            '}',
+				            
+				            'if( row != FS2 )',
+				                'v0[(col+FS2)/2] = v1[(col+FS2)/2].xy;',
+				        '}',
+				    '}',
+
+				    'return s/w;',
+				'}'			
+			].join('\n');
+		}
+		/*---------------End ShadowFragment---------------*/
 
 		/*---------------Begin AmbientLight---------------*/
 		{
@@ -1729,10 +2105,7 @@ Vector4D.prototype =
 				'}'
 				].join( '\n' );
 			}
-			U3DEW.AmbientLight.prototype = 
-			{
-				constructor: U3DEW.AmbientLight
-			}
+			U3DEW.AmbientLight.prototype = Object.create( U3DEW.Light.prototype );
 		}
 		/*---------------End AmbientLight---------------*/
 
@@ -1742,7 +2115,9 @@ Vector4D.prototype =
 			{
 				U3DEW.Light.call( this );
 				this.TypeLight = 'DirectionalLight';
-				this.Direction = new Vector3D(0.0,0.0,-1.0);
+				
+				
+
 				this.CodeFragmentShader = 
 				[
 				'precision mediump float;',
@@ -1751,9 +2126,11 @@ Vector4D.prototype =
 				'varying vec3 fTransformedTangent;',
 				'varying vec3 fTransformedBinormal;',
 				'varying vec4 fPos;',
+				'varying vec4 fLightPos;',
 
 				'uniform vec3 Direction;',
 				'uniform vec4 DirectionColor;',
+				
 
 				//Object
 				'uniform vec4 Ambient;',
@@ -1764,10 +2141,12 @@ Vector4D.prototype =
 				'uniform bool isDiffuseTexture;',
 				'uniform bool isSpecularTexture;',
 				'uniform bool isBumpTexture;',
+				'uniform bool isShadows;',
 
 				'uniform sampler2D DiffuseSampler;',
 				'uniform sampler2D BumpSampler;',
 				'uniform sampler2D SpecularSampler;',
+				'uniform sampler2D ShadowMapSampler;',
 
 
 				//Light
@@ -1775,11 +2154,20 @@ Vector4D.prototype =
 				'uniform bool isSpecular;',	
 
 				'uniform vec3 Camera;',
+				'uniform vec4 Dimensions;',
 
 				'void main() {',
 					'vec3 LightWeighting;',
 					'vec3 Normal = fTransformedNormal;',
 					'float fShininess = Shininess;',
+					'vec4 Shadow = vec4(1.0,1.0,1.0,1.0);',
+
+					'if(isShadows) {',
+						'vec3 LSp  = fLightPos.xyz / fLightPos.w;',
+						'vec2 ShadowTexC = 0.5 * LSp.xy + vec2( 0.5, 0.5 );',
+						'ShadowTexC.y = 1.0 - ShadowTexC.y;',
+						'Shadow = texture2D(ShadowMapSampler, ShadowTexC);',
+					'}',	
 
 					'if(isBumpTexture) {',
 						'vec3 bumpMap = texture2D(BumpSampler, vec2(fTexCoord.s, fTexCoord.t)).xyz * 2.0 - 1.0;',
@@ -1805,9 +2193,9 @@ Vector4D.prototype =
 
 					'if(isDiffuseTexture){',
 						'vec4 TextureColor = texture2D(DiffuseSampler, vec2(fTexCoord.s, fTexCoord.t));',
-						'gl_FragColor = (Ambient + Diffuse) * vec4(TextureColor.rgb * (SpecularWeighting * Specular.rgb + LightWeighting ), TextureColor.a);}',
+						'gl_FragColor = (Ambient + Diffuse) * vec4(TextureColor.rgb * (SpecularWeighting * Specular.rgb + LightWeighting ) * Shadow.rgb, TextureColor.a);}',
 					'else',
-					'gl_FragColor = (Ambient + Diffuse) * vec4(SpecularWeighting * Specular.rgb + LightWeighting, 1.0);',	
+					'gl_FragColor = (Ambient + Diffuse) * vec4(SpecularWeighting * Specular.rgb + LightWeighting, 1.0) * Shadow;',	
 				'}'].join( '\n' );
 
 				this.CodeVertexShader = 
@@ -1823,13 +2211,19 @@ Vector4D.prototype =
 				'uniform mat4 View;',
 				'uniform mat3 NormalWorld;',
 
+				'uniform mat4 LProjection;',
+				'uniform mat4 LWorld;',
+				'uniform mat4 LView;',
+
 				'varying vec2 fTexCoord;',
 				'varying vec3 fTransformedNormal;',
 				'varying vec3 fTransformedTangent;',
 				'varying vec3 fTransformedBinormal;',
 				'varying vec4 fPos;',
+				'varying vec4 fLightPos;',
 
 				'void main() {',
+					'fLightPos =   LProjection * LView * LWorld * vec4(Pos, 1.0);',
 					'fPos =   World * vec4(Pos, 1.0);',
 					'gl_Position = Projection * View * World * vec4(Pos, 1.0);',
 					'fTexCoord = TexCoord;',
@@ -1839,10 +2233,7 @@ Vector4D.prototype =
 				'}'
 				].join( '\n' );		
 			}
-			U3DEW.DirectionalLight.prototype = 
-			{
-				constructor: U3DEW.DirectionalLight
-			}
+			U3DEW.DirectionalLight.prototype = Object.create( U3DEW.Light.prototype );
 		}
 		/*---------------End DirectionalLight---------------*/
 
@@ -1947,10 +2338,7 @@ Vector4D.prototype =
 				'}'
 				].join( '\n' );			
 			}
-			U3DEW.PointLight.prototype = 
-			{
-				constructor: U3DEW.PointLight
-			}
+			U3DEW.PointLight.prototype = Object.create( U3DEW.Light.prototype );
 		}
 		/*---------------End PointLight---------------*/
 
@@ -2016,8 +2404,8 @@ Vector4D.prototype =
 							'D = 1.0 - min(length(L) / Distance, 1.0);',
 						'float SpotEffect = dot(normalize(L), Direction);',
 						'if(SpotEffect > Range) {',
-							'SpotEffect = pow(max(SpotEffect, 0.0), Exp);',
-							'LightWeighting = SpotColor.rgb * D * SpotEffect * max(dot( Normal, Direction ),0.0);',
+							'SpotEffect = max(pow(max(SpotEffect, 0.0), Exp), 0.0);',
+							'LightWeighting = SpotColor.rgb * D * SpotEffect * dot( Normal, Direction );',
 						'}',
 					'}',
 
@@ -2067,10 +2455,7 @@ Vector4D.prototype =
 				'}'
 				].join( '\n' );					
 			}
-			U3DEW.SpotLight.prototype = 
-			{
-				constructor: U3DEW.SpotLight
-			}
+			U3DEW.SpotLight.prototype = Object.create( U3DEW.Light.prototype );
 		}
 		/*---------------End SpotLight---------------*/
 	}
